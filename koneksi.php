@@ -1,7 +1,7 @@
 <?php
 $host     = "localhost";
-$username = "root"; // Sesuaikan dengan username database kamu
-$password = "";     // Sesuaikan dengan password database kamu
+$username = "root";
+$password = ""; // Kosongkan jika menggunakan XAMPP bawaan
 $database = "db_uas_pbo_ti1c_giatjohannasrulloh";
 
 // Membuat koneksi menggunakan MySQLi

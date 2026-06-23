@@ -1,56 +1,19 @@
 <?php
-// Menyertakan file koneksi database dan definisi class PBO
+// 1. Menyertakan koneksi database
 require_once 'koneksi.php';
+
+// 2. Menyertakan Kelas Induk (Abstract Class)
 require_once 'Karyawan.php';
 
-// Menyiapkan array penampung objek karyawan berdasarkan kategori
-$daftarKaryawanTetap = [];
-$daftarKaryawanKontrak = [];
-$daftarKaryawanMagang = [];
+// 3. Menyertakan 3 Kelas Anak (Subclass) yang sudah dipisah file-nya
+require_once 'KaryawanTetap.php';
+require_once 'KaryawanKontrak.php';
+require_once 'KaryawanMagang.php';
 
-// Query untuk mengambil semua data dari database
-$sql = "SELECT * FROM tabel_karyawan";
-$result = $koneksi->query($sql);
-
-if ($result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        
-        // Memisahkan instansiasi objek berdasarkan jenis_karyawan (Polimorfisme)
-        if ($row['jenis_karyawan'] == 'tetap') {
-            // Berikan nilai dummy/default untuk tunjanganKesehatan (misal: Rp 500.000) dan opsiSahamId
-            $tunjanganKesehatan = 500000; 
-            $opsiSahamId = "SHM-" . str_pad($row['id_karyawan'], 3, "0", STR_PAD_LEFT);
-            
-            $daftarKaryawanTetap[] = new KaryawanTetap(
-                $row['id_karyawan'], $row['nama_karyawan'], $row['departemen'], 
-                $row['hari_kerja_masuk'], $row['gaji_dasar_per_hari'], 
-                $tunjanganKesehatan, $opsiSahamId
-            );
-            
-        } elseif ($row['jenis_karyawan'] == 'kontrak') {
-            // Berikan nilai dummy/default untuk agensiPenyalur karena tidak ada di DB awal
-            $agensiPenyalur = "PT. Sinergi Bangsa";
-            
-            $daftarKaryawanKontrak[] = new KaryawanKontrak(
-                $row['id_karyawan'], $row['nama_karyawan'], $row['departemen'], 
-                $row['hari_kerja_masuk'], $row['gaji_dasar_per_hari'], 
-                $row['durasi_kontrak_bulan'], $agensiPenyalur
-            );
-            
-        } elseif ($row['jenis_karyawan'] == 'magang') {
-            // Untuk magang, jika gaji_dasar_per_hari di DB adalah 0, kita beri plafon dasar 
-            // harian fiktif (misal: Rp 120.000) agar rumus potongan 20% di Tahap 5 menghasilkan nilai.
-            $gajiDasarMagang = ($row['gaji_dasar_per_hari'] == 0) ? 120000 : $row['gaji_dasar_per_hari'];
-
-            // PERBAIKAN: Mengubah $row['uangSakuBulanan'] menjadi $row['uang_saku_bulanan'] sesuai kolom DB
-            $daftarKaryawanMagang[] = new KaryawanMagang(
-                $row['id_karyawan'], $row['nama_karyawan'], $row['departemen'], 
-                $row['hari_kerja_masuk'], $gajiDasarMagang, 
-                $row['uang_saku_bulanan'], $row['sertifikat_kampus_merdeka']
-            );
-        }
-    }
-}
+// TAHAP 6: Mengambil kelompok data via query subclass (Sesuai Kriteria Rubrik)
+$daftarKaryawanTetap   = KaryawanTetap::ambilDataDariDB($koneksi);
+$daftarKaryawanKontrak = KaryawanKontrak::ambilDataDariDB($koneksi);
+$daftarKaryawanMagang  = KaryawanMagang::ambilDataDariDB($koneksi);
 ?>
 
 <!DOCTYPE html>
@@ -94,24 +57,7 @@ if ($result->num_rows > 0) {
                 <tr><td colspan="8" style="text-align:center;">Tidak ada data.</td></tr>
             <?php else: ?>
                 <?php foreach($daftarKaryawanTetap as $k): ?>
-                    <?php 
-                        $ref = new ReflectionClass($k);
-                        $props = [];
-                        foreach($ref->getProperties() as $p) {
-                            $p->setAccessible(true);
-                            $props[$p->getName()] = $p->getValue($k);
-                        }
-                    ?>
-                    <tr>
-                        <td><?= $props['id_karyawan']; ?></td>
-                        <td><strong><?= $props['nama_karyawan']; ?></strong></td>
-                        <td><?= $props['departemen']; ?></td>
-                        <td><?= $props['hari_kerja_masuk']; ?> hari</td>
-                        <td class="text-right">Rp <?= number_format($props['gaji_dasar_per_hari'], 0, ',', '.'); ?></td>
-                        <td class="text-right" style="color: #27ae60;">Rp <?= number_format($props['tunjanganKesehatan'], 0, ',', '.'); ?></td>
-                        <td><code><?= $props['opsiSahamId']; ?></code></td>
-                        <td class="text-right" style="font-weight: bold; background: #eef9f1;">Rp <?= number_format($k->hitungGajiBersih(), 0, ',', '.'); ?></td>
-                    </tr>
+                    <?php $k->tampilkanProfilKaryawan(); // Eksekusi Polimorfisme Murni dari KaryawanTetap.php ?>
                 <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
@@ -136,24 +82,7 @@ if ($result->num_rows > 0) {
                 <tr><td colspan="8" style="text-align:center;">Tidak ada data.</td></tr>
             <?php else: ?>
                 <?php foreach($daftarKaryawanKontrak as $k): ?>
-                    <?php 
-                        $ref = new ReflectionClass($k);
-                        $props = [];
-                        foreach($ref->getProperties() as $p) {
-                            $p->setAccessible(true);
-                            $props[$p->getName()] = $p->getValue($k);
-                        }
-                    ?>
-                    <tr>
-                        <td><?= $props['id_karyawan']; ?></td>
-                        <td><strong><?= $props['nama_karyawan']; ?></strong></td>
-                        <td><?= $props['departemen']; ?></td>
-                        <td><?= $props['hari_kerja_masuk']; ?> hari</td>
-                        <td class="text-right">Rp <?= number_format($props['gaji_dasar_per_hari'], 0, ',', '.'); ?></td>
-                        <td><?= $props['durasiKontrakBulan']; ?> Bulan</td>
-                        <td><?= $props['agensiPenyalur']; ?></td>
-                        <td class="text-right" style="font-weight: bold; background: #fff8f2;">Rp <?= number_format($k->hitungGajiBersih(), 0, ',', '.'); ?></td>
-                    </tr>
+                    <?php $k->tampilkanProfilKaryawan(); // Eksekusi Polimorfisme Murni dari KaryawanKontrak.php ?>
                 <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
@@ -177,23 +106,7 @@ if ($result->num_rows > 0) {
                 <tr><td colspan="7" style="text-align:center;">Tidak ada data.</td></tr>
             <?php else: ?>
                 <?php foreach($daftarKaryawanMagang as $k): ?>
-                    <?php 
-                        $ref = new ReflectionClass($k);
-                        $props = [];
-                        foreach($ref->getProperties() as $p) {
-                            $p->setAccessible(true);
-                            $props[$p->getName()] = $p->getValue($k);
-                        }
-                    ?>
-                    <tr>
-                        <td><?= $props['id_karyawan']; ?></td>
-                        <td><strong><?= $props['nama_karyawan']; ?></strong></td>
-                        <td><?= $props['departemen']; ?></td>
-                        <td><?= $props['hari_kerja_masuk']; ?> hari</td>
-                        <td class="text-right">Rp <?= number_format($props['gaji_dasar_per_hari'], 0, ',', '.'); ?></td>
-                        <td><?= !empty($props['sertifikatKampusMerdeka']) ? $props['sertifikatKampusMerdeka'] : '<span style="color:#aaa; font-style:italic;">Tidak Ada</span>'; ?></td>
-                        <td class="text-right" style="font-weight: bold; background: #fdf5ff; color: #c0392b;">Rp <?= number_format($k->hitungGajiBersih(), 0, ',', '.'); ?></td>
-                    </tr>
+                    <?php $k->tampilkanProfilKaryawan(); // Eksekusi Polimorfisme Murni dari KaryawanMagang.php ?>
                 <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
